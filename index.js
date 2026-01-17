@@ -1,119 +1,150 @@
-$(document).ready(function () {
-    // Configuration for long press (desktop)
-    const longPressDuration = 300; // Duration in milliseconds for a long press
-    let pressTimer;
-    let startX, startY;
-    const moveThreshold = 5; // Movement threshold in pixels
+// CT-CoTCollapser
+// An extension to easily collapse reasoning/CoT blocks by pressing (long-press) or double-tapping.
 
-    // Desktop: long press detection using mouse events on .mes_reasoning (original)
-    $(document).on("mousedown", ".mes_reasoning", function (e) {
-        const $this = $(this);
+(function () {
+    // Configuration
+    const CONFIG = {
+        longPressDuration: 300, // ms
+        doubleTapDelay: 300, // ms
+        moveThreshold: 5, // pixels
+    };
+
+    /**
+     * Helper to close an open details element
+     * @param {jQuery} $details
+     */
+    function collapseDetails($details) {
+        if ($details && $details.length && $details.is("[open]")) {
+            $details.removeAttr("open");
+        }
+    }
+
+    /**
+     * Target Definitions
+     * Defines selectors and logic for finding the collapsible element from the trigger.
+     */
+    const TARGETS = [
+        // Standard SillyTavern Reasoning Block
+        {
+            selector: ".mes_reasoning",
+            getCollapsible: function ($target) {
+                return $target.closest("details.mes_reasoning_details");
+            },
+            isValid: () => true,
+        },
+        // SteppedThinking Extension Support
+        {
+            selector: ".mes_text",
+            getCollapsible: function ($target) {
+                return $target.find('details[type="executing"][open]');
+            },
+            isValid: function ($target) {
+                const $mes = $target.closest(".mes");
+                return $mes.attr("ch_name") === "SteppedThinking";
+            },
+        },
+    ];
+
+    // State Variables
+    let pressTimer = null;
+    let startX = 0;
+    let startY = 0;
+    let lastTapTime = 0;
+
+    /**
+     * Handle Long Press (Desktop/Mouse)
+     */
+    function handleMouseDown(e) {
+        const $target = $(this);
+        const targetDef = TARGETS.find(
+            (t) => $target.is(t.selector) && t.isValid($target),
+        );
+
+        if (!targetDef) return;
+
         startX = e.pageX;
         startY = e.pageY;
 
         pressTimer = window.setTimeout(function () {
-            const $details = $this.closest("details.mes_reasoning_details");
-            if ($details.length && $details.is("[open]")) {
-                $details.removeAttr("open");
-            }
-        }, longPressDuration);
+            const $collapsible = targetDef.getCollapsible($target);
+            collapseDetails($collapsible);
+        }, CONFIG.longPressDuration);
 
-        // Prevent text selection by cancelling the timer if the user moves too much
-        $this.on("mousemove.longPress", function (e) {
-            let moveX = e.pageX;
-            let moveY = e.pageY;
+        // Cancel on move
+        $target.on("mousemove.longPress", function (moveEvent) {
             if (
-                Math.abs(moveX - startX) > moveThreshold ||
-                Math.abs(moveY - startY) > moveThreshold
+                Math.abs(moveEvent.pageX - startX) > CONFIG.moveThreshold ||
+                Math.abs(moveEvent.pageY - startY) > CONFIG.moveThreshold
             ) {
                 clearTimeout(pressTimer);
-                $this.off("mousemove.longPress");
+                $target.off("mousemove.longPress");
             }
         });
-    });
+    }
 
-    // Cancel the long press if the mouse is released or leaves the element (original)
-    $(document).on("mouseup mouseleave", ".mes_reasoning", function () {
-        clearTimeout(pressTimer);
+    function handleMouseUpOrLeave() {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
         $(this).off("mousemove.longPress");
-    });
+    }
 
-    // Mobile: Use double-tap detection instead of long press for .mes_reasoning (original)
-    let lastTapTime = 0;
-    const doubleTapDelay = 300; // Maximum delay between taps in milliseconds
-    $(document).on("touchend", ".mes_reasoning", function (e) {
-        let currentTime = new Date().getTime();
-        let tapLength = currentTime - lastTapTime;
-        if (tapLength < doubleTapDelay && tapLength > 0) {
-            const $details = $(this).closest("details.mes_reasoning_details");
-            if ($details.length && $details.is("[open]")) {
-                $details.removeAttr("open");
-            }
-            lastTapTime = 0; // reset
+    /**
+     * Handle Double Click (Desktop/Mouse)
+     * Native dblclick event
+     */
+    function handleDoubleClick(e) {
+        const $target = $(this);
+        const targetDef = TARGETS.find(
+            (t) => $target.is(t.selector) && t.isValid($target),
+        );
+
+        if (!targetDef) return;
+
+        // Prevent selecting text on double click if we are collapsing
+        // e.preventDefault(); // Optional: might annoy users if they want to select word.
+        // Let's only collapse.
+
+        const $collapsible = targetDef.getCollapsible($target);
+        collapseDetails($collapsible);
+    }
+
+    /**
+     * Handle Double Tap (Mobile/Touch)
+     */
+    function handleTouchEnd(e) {
+        const $target = $(this);
+        const targetDef = TARGETS.find(
+            (t) => $target.is(t.selector) && t.isValid($target),
+        );
+
+        if (!targetDef) return;
+
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+
+        if (tapLength < CONFIG.doubleTapDelay && tapLength > 0) {
+            const $collapsible = targetDef.getCollapsible($target);
+            collapseDetails($collapsible);
+            lastTapTime = 0;
         } else {
             lastTapTime = currentTime;
         }
+    }
+
+    // Initialization
+    $(document).ready(function () {
+        // Construct selector string for all targets
+        const selectorString = TARGETS.map((t) => t.selector).join(", ");
+
+        // Bind Events
+        $(document)
+            .on("mousedown", selectorString, handleMouseDown)
+            .on("mouseup mouseleave", selectorString, handleMouseUpOrLeave)
+            .on("dblclick", selectorString, handleDoubleClick)
+            .on("touchend", selectorString, handleTouchEnd);
+
+        console.log("[CT-CoTCollapser] Initialized.");
     });
-
-    // --- Additional functionality for .mes_text of SteppedThinking ---
-    // Desktop: long press on .mes_text with ch_name "SteppedThinking"
-    $(document).on("mousedown", ".mes_text", function (e) {
-        const $mes = $(this).closest(".mes");
-        // Only proceed if the message's ch_name is "SteppedThinking"
-        if ($mes.attr("ch_name") !== "SteppedThinking") return;
-
-        startX = e.pageX;
-        startY = e.pageY;
-
-        pressTimer = window.setTimeout(() => {
-            // Find the <details> with type executing that is open
-            const $detailsExec = $(this).find(
-                'details[type="executing"][open]',
-            );
-            if ($detailsExec.length) {
-                $detailsExec.removeAttr("open");
-            }
-        }, longPressDuration);
-
-        // Cancel timer if movement is too high
-        $(this).on("mousemove.longPress", function (e) {
-            let moveX = e.pageX;
-            let moveY = e.pageY;
-            if (
-                Math.abs(moveX - startX) > moveThreshold ||
-                Math.abs(moveY - startY) > moveThreshold
-            ) {
-                clearTimeout(pressTimer);
-                $(this).off("mousemove.longPress");
-            }
-        });
-    });
-
-    // Cancel the long press for .mes_text if the mouse is released or leaves
-    $(document).on("mouseup mouseleave", ".mes_text", function () {
-        clearTimeout(pressTimer);
-        $(this).off("mousemove.longPress");
-    });
-
-    // Mobile: double-tap detection on .mes_text for SteppedThinking
-    let lastTapTimeText = 0;
-    $(document).on("touchend", ".mes_text", function (e) {
-        const $mes = $(this).closest(".mes");
-        if ($mes.attr("ch_name") !== "SteppedThinking") return;
-
-        let currentTime = new Date().getTime();
-        let tapLength = currentTime - lastTapTimeText;
-        if (tapLength < doubleTapDelay && tapLength > 0) {
-            // Double-tap detected: collapse the details with type executing if open
-            const $detailsExec = $(this).find(
-                'details[type="executing"][open]',
-            );
-            if ($detailsExec.length) {
-                $detailsExec.removeAttr("open");
-            }
-            lastTapTimeText = 0; // reset
-        } else {
-            lastTapTimeText = currentTime;
-        }
-    });
-});
+})();

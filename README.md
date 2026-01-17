@@ -1,33 +1,41 @@
-# SillyTavern Extension Example
+# CT-CoTCollapser
 
-_Provide a brief description of how your extension works, what problem it aims to solve._
+A SillyTavern/CozyTavern extension that improves the quality of life when working with Chain of Thought (CoT) or Reasoning blocks.
+
+It allows you to quickly **collapse/close** an open reasoning block by interacting with its content, saving you from having to hunt for the small "collapse" chevron/arrow.
 
 ## Features
 
-_Describe some of the main selling points of your extension._
+- **Long Press (Desktop/Mobile):** Click and hold (300ms) anywhere on the reasoning text to collapse the block.
+- **Double Click (Desktop):** Double-click anywhere on the reasoning text to collapse.
+- **Double Tap (Mobile):** Double-tap on the text to collapse.
+- **SteppedThinking Support:** Also supports collapsing `executing` blocks from the SteppedThinking extension.
 
-## Installation and Usage
+## Installation
 
-### Installation
+### Automated Installation
 
-_In most cases, this should just be using ST's inbuilt extension installer._
+If this extension is available in the SillyTavern "Download Extensions" list, simply search for it and click install.
 
-### Usage
+### Manual Installation
 
-_Explain how to use this extension._
+1. Open your SillyTavern installation folder.
+2. Navigate to `public/scripts/extensions/third-party`.
+3. Clone or download this repository into a new folder named `CT-CoTCollapser`.
+   ```bash
+   git clone https://github.com/leyam3k/CT-CoTCollapser
+   ```
+4. Restart SillyTavern or reload the page.
 
-## Prerequisites
+## Usage
 
-_Specify the version of ST necessary here._
+Simply interact with any **expanded** reasoning block (the grey box showing the AI's thought process):
 
-## Support and Contributions
+- **Mouse:** Click and hold for 0.3s OR Double-click.
+- **Touch:** Long press OR Double-tap.
 
-_Where should someone ask for support?_
-
-_Consider including your own contact info for help/questions._
-
-_How can people help add to this extension?_
+The block will close.
 
 ## License
 
-_Be cool, use an open source license._
+MIT
